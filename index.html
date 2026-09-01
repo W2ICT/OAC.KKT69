@@ -399,24 +399,35 @@ table.grid td.act{display:flex;gap:6px}
 
 /* ============ PRINT ============ */
 .print-only{display:none}
+/* หน้ากระดาษ: คุมระยะขอบเองด้วย padding แทนการพึ่ง @page margin อย่างเดียว
+   เพราะเบราว์เซอร์/ไดรเวอร์ PDF บางตัวไม่ยึด @page margin ตามที่ตั้งไว้เสมอ */
 @media print{
   body.printing-report *{visibility:hidden!important}
   body.printing-report #repPrintArea,body.printing-report #repPrintArea *{visibility:visible!important}
-  body.printing-report #repPrintArea{position:absolute;left:0;top:0;width:100%;display:block}
+  body.printing-report #repPrintArea{
+    position:absolute;left:0;top:0;width:100%;display:block;
+    padding:14mm 13mm;box-sizing:border-box;
+  }
   body{background:#fff;color:#111}
   body::before,body::after{display:none}
   .topbar,.btnrow,.no-print,.foot,.adm-tabs,.searchbar,.progress{display:none!important}
-  .wrap{max-width:100%;padding:0}
+  .wrap{max-width:100%;width:100%;padding:14mm 13mm;box-sizing:border-box;margin:0}
   .print-only{display:block}
   .card,.panel,.ticket,.kpi{box-shadow:none;border-color:#ccc;background:#fff!important;color:#111}
+  .ticket{max-width:100%}
   .ticket .qrbox{border:1px solid #ccc}
+  .tablescroll{overflow:visible;border-color:#bbb}
+  table.grid{table-layout:fixed;width:100%}
+  table.grid th,table.grid td{
+    white-space:normal;word-break:break-word;overflow-wrap:break-word;
+    background:#fff;font-size:10.5px;padding:6px 7px;border-color:#bbb;
+  }
   table.grid th{background:#eee;color:#111;position:static}
-  table.grid td,table.grid th{border-color:#bbb}
   .trow span,.kpi .k{color:#555}
   .regid,.ticket .th b,.panel h3{color:#111!important}
   a[href]:after{content:""}
 }
-@page{size:A4;margin:14mm}
+@page{size:A4;margin:0}
 </style>
 </head>
 <body>
