@@ -408,6 +408,7 @@ table.grid td.act{display:flex;gap:6px}
     position:absolute;left:0;top:0;width:100%;display:block;
     padding:14mm 13mm;box-sizing:border-box;
   }
+  body.printing-report #repPrintArea.landscape{ page:landscape; }
   body{background:#fff;color:#111}
   body::before,body::after{display:none}
   .topbar,.btnrow,.no-print,.foot,.adm-tabs,.searchbar,.progress{display:none!important}
@@ -428,6 +429,7 @@ table.grid td.act{display:flex;gap:6px}
   a[href]:after{content:""}
 }
 @page{size:A4;margin:0}
+@page landscape{size:A4 landscape;margin:0}
 </style>
 </head>
 <body>
@@ -1528,6 +1530,7 @@ function shirtDetailTable(d){
   return '<h3 style="margin-top:18px">รายชื่อผู้สั่งเสื้อ</h3><table class="grid"><tr><th>รหัส</th><th>ชื่อ</th><th>สังกัด</th><th>ไซซ์ประจำตัว</th><th>สั่งเพิ่ม</th></tr>'+
     list.map(function(r){return '<tr><td>'+esc(r.regId)+'</td><td>'+esc(fullName(r))+'</td><td>'+esc(r.unit||"")+'</td><td>'+esc(r.ownShirtSize||"-")+'</td><td>'+esc(extrasText(r.extraShirts)||"-")+'</td></tr>';}).join("")+'</table>';
 }
+var LANDSCAPE_REPORTS=["all"];   /* รายงานที่คอลัมน์เยอะ พิมพ์แนวนอนอ่านง่ายกว่า */
 function buildReport(key,fmt){
   var def=reportDef(key);
   if(fmt==="xls"){ exportXls(def.title,def.H,def.rows); return; }
@@ -1537,9 +1540,10 @@ function buildReport(key,fmt){
     '<table class="grid"><tr>'+def.H.map(function(h){return '<th>'+esc(h)+'</th>';}).join("")+'</tr>'+
     def.rows.map(function(r){return '<tr>'+r.map(function(c){return '<td>'+esc(c==null?"":c)+'</td>';}).join("")+'</tr>';}).join("")+'</table>'+
     (def.extra||"");
+  area.classList.toggle("landscape", LANDSCAPE_REPORTS.indexOf(key)>=0);
   document.body.classList.add("printing-report");
   window.print();
-  setTimeout(function(){ area.innerHTML=""; document.body.classList.remove("printing-report"); },800);
+  setTimeout(function(){ area.innerHTML=""; area.classList.remove("landscape"); document.body.classList.remove("printing-report"); },800);
 }
 function exportXls(name,H,rows){
   var html='<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="UTF-8"><!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>'+esc(name).slice(0,28)+'</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]--></head><body>'+
