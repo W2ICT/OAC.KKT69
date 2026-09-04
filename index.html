@@ -1496,7 +1496,7 @@ function admEdit(regId){
       '<div class="field" style="flex:1"><label>ยอดค้างชำระ</label><input class="inp" id="eDue" inputmode="numeric" value="'+esc(r.amountDue||0)+'"></div>'+
     '</div>'+
     '<div class="field"><label>สถานะชำระเงิน</label><select class="sel" id="ePay">'+
-      ["","รอชำระ","รอตรวจสอบ","ชำระแล้ว"].map(function(x){return '<option'+(r.payStatus===x?" selected":"")+'>'+(x||"— ไม่มี —")+'</option>';}).join("")+'</select></div>'+
+      ["","รอชำระ","รอตรวจสอบ","ชำระแล้ว"].map(function(x){return '<option value="'+esc(x)+'"'+(r.payStatus===x?" selected":"")+'>'+(x||"— ไม่มี —")+'</option>';}).join("")+'</select></div>'+
     (r.slipUrl?'<div class="field"><a href="'+esc(r.slipUrl)+'" target="_blank">เปิดสลิปโอนเงิน ↗</a></div>':'')+
     '<div class="field"><label>อาหารที่แพ้</label><input class="inp" id="eAllergy" value="'+esc(r.allergy||"")+'"></div>'+
     '<div class="field"><label>หมายเหตุ</label><input class="inp" id="eNote" value="'+esc(r.note||"")+'"></div>'+
@@ -1529,24 +1529,42 @@ function admDelete(regId){
   };
 }
 
-/* ---- ROSTER · คลังรายชื่อ ชนอ. (สำหรับตรวจสอบหน้างาน) ---- */
+/* ---- ROSTER · คลังรายชื่อ ชนอ. (สำหรับตรวจสอบ + แก้ไขข้อมูลผู้ลงทะเบียน หน้างาน) ---- */
 var RANK_ORDER=["พล.อ.อ.","พล.อ.ท.","พล.อ.ต.","น.อ.(พ)","น.อ.","น.ท.","น.ต.","ร.อ.","ร.ท.","ร.ต.","ว่าที่ น.อ.","ว่าที่ น.ท.","จ.อ."];
 function rankRank(r){ var i=RANK_ORDER.indexOf(String(r||"").trim()); return i<0?99:i; }
-var RS={ q:"", rank:"", tt:"", ch:"", unit:"", sort:"name" };
+var RS={ q:"", rank:"", tt:"", ch:"", unit:"", reg:"", sort:"name", detail:true };
+function rsKey(o){ return ((o.f||o.firstName||"")+"|"+(o.l||o.lastName||"")).trim().toLowerCase(); }
+/* map: ชื่อ|สกุล -> record ผู้ลงทะเบียน (ดึงจาก ADM.data) */
 function rosterRegMap(){
   var m={};
-  (ADM.data||[]).forEach(function(x){
-    var k=((x.firstName||"")+"|"+(x.lastName||"")).trim().toLowerCase();
-    if(k!=="|") m[k]=1;
-  });
+  (ADM.data||[]).forEach(function(x){ var k=rsKey(x); if(k!=="|") m[k]=x; });
   return m;
+}
+/* รวมคลัง ชนอ. + ผู้ลงทะเบียนที่ไม่มีชื่อในคลัง (กรอกเอง/นอกคลัง) ให้เป็นชุดเดียว */
+function rosterAll(reg){
+  var have={};
+  var base=ROSTER.map(function(r){ have[rsKey(r)]=1; return r; });
+  var extra=(ADM.data||[]).filter(function(x){ var k=rsKey(x); return k!=="|" && !have[k]; })
+    .map(function(x){ return { r:x.prefix||"", f:x.firstName||"", l:x.lastName||"", tt:x.genTT||"", ch:x.genCHNO||"", u:x.unit||"", p:x.position||"", _extra:true }; });
+  return base.concat(extra);
+}
+/* helper แสดงค่าคอลัมน์รายละเอียดการลงทะเบียน (ใช้ทั้งบนจอและตอนพิมพ์) */
+function rsGolf(x){ return x&&x.joinGolf==="Y" ? (x.golfTravel==="รถบัส บน.2"?"✓ บัส":"✓") : "–"; }
+function rsDinner(x){ return x&&x.joinDinner==="Y" ? (x.dinnerTravel==="รถบัส บน.2"?"✓ บัส":"✓") : "–"; }
+function rsShirt(x){ return x&&x.ownShirtSize ? esc(x.ownShirtSize)+(+x.extraQty?"+"+x.extraQty:"") : "–"; }
+function rsCheckin(x){ if(!x)return"–"; var s=(x.checkinGolfAt?"⛳":"")+(x.checkinDinnerAt?"🍽":""); return s||"–"; }
+function rsMoneyText(x){ return x&&+x.amountDue>0 ? (x.payStatus==="ชำระแล้ว"?"ชำระแล้ว":(x.payStatus||"ค้างชำระ")+" "+thb(x.amountDue)) : "–"; }
+function rsMoneyCell(x){
+  if(!(x&&+x.amountDue>0)) return "–";
+  return x.payStatus==="ชำระแล้ว" ? '<span class="badge ok">จ่าย</span>' : '<span class="badge bad">'+thb(x.amountDue)+'</span>';
 }
 function admRoster(body){
   var reg=rosterRegMap();
-  function keyOf(r){ return ((r.f||"")+"|"+(r.l||"")).trim().toLowerCase(); }
+  var ALL=rosterAll(reg);
+  var nExtra=ALL.length-ROSTER.length;
   function distinct(key,numeric){
     var seen={},out=[];
-    ROSTER.forEach(function(r){ var v=String(r[key]||"").trim(); if(v&&v!=="-"&&!seen[v]){seen[v]=1;out.push(v);} });
+    ALL.forEach(function(r){ var v=String(r[key]||"").trim(); if(v&&v!=="-"&&!seen[v]){seen[v]=1;out.push(v);} });
     out.sort(numeric?function(a,b){return (+a||0)-(+b||0);}
       :key==="r"?function(a,b){return rankRank(a)-rankRank(b)||a.localeCompare(b,"th");}
       :function(a,b){return a.localeCompare(b,"th");});
@@ -1561,43 +1579,56 @@ function admRoster(body){
   var ranks=distinct("r"), tts=distinct("tt",true), chs=distinct("ch",true), units=distinct("u");
 
   body.innerHTML=
-    '<div class="panel"><h3>คลังรายชื่อ ชนอ. — ฐานข้อมูลทั้งหมด ('+ROSTER.length+' คน)'+
-      '<div class="exp"><button class="mini" id="rsPrint">🖨 พิมพ์ / PDF</button></div></h3>'+
-    '<div style="font-size:12px;color:var(--faint);margin:0 0 12px">รายชื่อทุกคนในระบบ ไว้ค้น/ตรวจสอบหน้างาน &nbsp;·&nbsp; '+
+    '<div class="panel"><h3>คลังรายชื่อ ชนอ. — ฐานข้อมูลทั้งหมด ('+ALL.length+' คน)'+
+      '<div class="exp"><button class="mini" id="rsXls">⬇ Excel</button><button class="mini" id="rsPrint">🖨 พิมพ์ / PDF</button></div></h3>'+
+    '<div style="font-size:12px;color:var(--faint);margin:0 0 12px">คลัง ชนอ. '+ROSTER.length+' คน'+(nExtra?' + ลงทะเบียนนอกคลัง '+nExtra+' คน':'')+' · ไว้ค้น/ตรวจสอบ/แก้ไขข้อมูลหน้างาน &nbsp;·&nbsp; '+
       '<span class="reg-dot yes"></span>ลงทะเบียนแล้ว &nbsp;&nbsp; <span class="reg-dot no"></span>ยังไม่ลงทะเบียน</div>'+
-    '<div class="searchbar"><input class="inp" id="rsQ" placeholder="ค้นหา ยศ / ชื่อ / สกุล / รุ่น / สังกัด / ตำแหน่ง" value="'+esc(RS.q)+'"></div>'+
+    '<div class="searchbar"><input class="inp" id="rsQ" placeholder="ค้นหา ยศ / ชื่อ / สกุล / รุ่น / สังกัด / ตำแหน่ง / เบอร์" value="'+esc(RS.q)+'"></div>'+
     '<div class="filterbar">'+
       fcol("rsRank","ยศ",ranks,RS.rank)+
       fcol("rsTt","รุ่น ตท.",tts,RS.tt)+
       fcol("rsCh","รุ่น ชนอ./นนอ.",chs,RS.ch)+
       fcol("rsUnit","สังกัด",units,RS.unit)+
+      '<div class="fcol"><label>สถานะลงทะเบียน</label><select class="sel'+(RS.reg?" act":"")+'" id="rsReg">'+
+        [["","ทั้งหมด"],["y","ลงทะเบียนแล้ว"],["n","ยังไม่ลงทะเบียน"]]
+        .map(function(o){return '<option value="'+o[0]+'"'+(RS.reg===o[0]?" selected":"")+'>'+o[1]+'</option>';}).join("")+
+      '</select></div>'+
       '<div class="fcol"><label>เรียงตาม</label><select class="sel" id="rsSort">'+
         [["name","ชื่อ"],["rank","ยศ"],["tt","รุ่น ตท."],["ch","รุ่น ชนอ."],["unit","สังกัด"]]
         .map(function(o){return '<option value="'+o[0]+'"'+(RS.sort===o[0]?" selected":"")+'>'+o[1]+'</option>';}).join("")+
       '</select></div>'+
     '</div>'+
     '<div class="rosterbar"><span class="cnt" id="rsCount"></span><span class="spacer"></span>'+
+      '<button class="mini" id="rsDetail">'+(RS.detail?"▾ ซ่อนรายละเอียดลงทะเบียน":"▸ แสดงรายละเอียดลงทะเบียน")+'</button>'+
       '<button class="mini" id="rsClear">ล้างตัวกรอง</button></div>'+
     '<div id="rsTable"></div></div>'+
     '<div id="rosterPrintArea" class="print-only"></div>';
 
   var qi=$("#rsQ",body);
   qi.oninput=function(){ RS.q=qi.value.trim(); paint(); };
-  [["rsRank","rank"],["rsTt","tt"],["rsCh","ch"],["rsUnit","unit"]].forEach(function(p){
+  [["rsRank","rank"],["rsTt","tt"],["rsCh","ch"],["rsUnit","unit"],["rsReg","reg"]].forEach(function(p){
     var e=$("#"+p[0],body); e.onchange=function(){ RS[p[1]]=e.value; paint(); };
   });
   $("#rsSort",body).onchange=function(){ RS.sort=this.value; paint(); };
-  $("#rsClear",body).onclick=function(){ RS.q="";RS.rank="";RS.tt="";RS.ch="";RS.unit="";RS.sort="name"; render(); };
-  $("#rsPrint",body).onclick=function(){ printRoster(computeRows()); };
+  $("#rsDetail",body).onclick=function(){ RS.detail=!RS.detail; render(); };
+  $("#rsClear",body).onclick=function(){ RS.q="";RS.rank="";RS.tt="";RS.ch="";RS.unit="";RS.reg="";RS.sort="name"; render(); };
+  $("#rsPrint",body).onclick=function(){ printRoster(computeRows(),reg); };
+  $("#rsXls",body).onclick=function(){ rsExport(computeRows(),reg); };
 
   function computeRows(){
     var q=RS.q.toLowerCase();
-    var rows=ROSTER.filter(function(r){
+    var rows=ALL.filter(function(r){
       if(RS.rank && String(r.r||"").trim()!==RS.rank) return false;
       if(RS.tt   && String(r.tt||"").trim()!==RS.tt) return false;
       if(RS.ch   && String(r.ch||"").trim()!==RS.ch) return false;
       if(RS.unit && String(r.u||"").trim()!==RS.unit) return false;
-      if(q){ var hay=(r.r+" "+r.f+" "+r.l+" "+r.tt+" "+r.ch+" "+r.u+" "+(r.p||"")).toLowerCase(); if(hay.indexOf(q)<0) return false; }
+      var x=reg[rsKey(r)];
+      if(RS.reg==="y" && !x) return false;
+      if(RS.reg==="n" && x) return false;
+      if(q){
+        var hay=(r.r+" "+r.f+" "+r.l+" "+r.tt+" "+r.ch+" "+r.u+" "+(r.p||"")+" "+(x?digits(x.phone):"")).toLowerCase();
+        if(hay.indexOf(q)<0) return false;
+      }
       return true;
     });
     var by=RS.sort;
@@ -1611,39 +1642,94 @@ function admRoster(body){
     return rows;
   }
   function paint(){
-    var rows=computeRows();
+    var rows=computeRows(), d=RS.detail;
     $$(".filterbar .sel",body).forEach(function(s){ if(s.id!=="rsSort") s.classList.toggle("act",!!s.value); });
-    var regN=rows.reduce(function(a,r){return a+(reg[keyOf(r)]?1:0);},0);
+    var regN=rows.reduce(function(a,r){return a+(reg[rsKey(r)]?1:0);},0);
     var c=$("#rsCount",body);
-    if(c) c.innerHTML='แสดง <b>'+rows.length+'</b> / '+ROSTER.length+' คน · ลงทะเบียนแล้ว <b>'+regN+'</b>';
+    if(c) c.innerHTML='แสดง <b>'+rows.length+'</b> / '+ALL.length+' คน · ลงทะเบียนแล้ว <b>'+regN+'</b> · ยังไม่ลงทะเบียน <b>'+(rows.length-regN)+'</b>';
+    var cols=8+(d?6:0)+1;
     $("#rsTable",body).innerHTML='<div class="tablescroll"><table class="grid"><tr>'+
-      '<th></th><th>ยศ</th><th>ชื่อ</th><th>สกุล</th><th>รุ่น ตท.</th><th>รุ่น ชนอ.</th><th>สังกัด</th><th>ตำแหน่ง</th></tr>'+
+      '<th></th><th>ยศ</th><th>ชื่อ</th><th>สกุล</th><th>รุ่น ตท.</th><th>รุ่น ชนอ.</th><th>สังกัด</th><th>ตำแหน่ง</th>'+
+      (d?'<th>เบอร์โทร</th><th>กอล์ฟ</th><th>เลี้ยง</th><th>เสื้อ</th><th>เงิน</th><th>เช็คอิน</th>':'')+
+      '<th>จัดการ</th></tr>'+
       rows.map(function(r){
-        var isReg=!!reg[keyOf(r)];
-        return '<tr><td><span class="reg-dot '+(isReg?"yes":"no")+'" title="'+(isReg?"ลงทะเบียนแล้ว":"ยังไม่ลงทะเบียน")+'"></span></td>'+
-          '<td>'+esc(r.r||"-")+'</td><td>'+esc(r.f||"-")+'</td><td>'+esc(r.l||"-")+'</td>'+
+        var x=reg[rsKey(r)];
+        var dotTitle = x ? (r._extra?"ลงทะเบียนแล้ว (นอกคลัง ชนอ.)":"ลงทะเบียนแล้ว") : "ยังไม่ลงทะเบียน";
+        return '<tr'+(r._extra?' title="ลงทะเบียนเพิ่มเติม — ไม่มีชื่อในคลัง ชนอ."':'')+'>'+
+          '<td><span class="reg-dot '+(x?"yes":"no")+'" title="'+dotTitle+'"></span></td>'+
+          '<td>'+esc(r.r||"-")+'</td>'+
+          '<td>'+esc(r.f||"-")+(r._extra?' <span style="font-size:10px;color:var(--gold-2)">✚นอกคลัง</span>':'')+'</td>'+
+          '<td>'+esc(r.l||"-")+'</td>'+
           '<td>'+esc(r.tt||"-")+'</td><td>'+esc(r.ch||"-")+'</td>'+
-          '<td>'+esc(r.u||"-")+'</td><td>'+esc(r.p||"-")+'</td></tr>';
+          '<td>'+esc(r.u||"-")+'</td><td>'+esc(r.p||"-")+'</td>'+
+          (d?'<td>'+(x?fmtPhone(x.phone):"–")+'</td>'+
+             '<td>'+rsGolf(x)+'</td><td>'+rsDinner(x)+'</td>'+
+             '<td>'+rsShirt(x)+'</td><td>'+rsMoneyCell(x)+'</td><td>'+rsCheckin(x)+'</td>':'')+
+          '<td class="act">'+(x
+            ? '<button class="rowbtn" data-reg="'+esc(x.regId)+'">แก้ไข</button>'
+            : '<span style="color:var(--faint);font-size:11.5px">ยังไม่ลงทะเบียน</span>')+'</td></tr>';
       }).join("")+
-      (rows.length?"":'<tr><td colspan="8" style="text-align:center;color:var(--faint);padding:22px">ไม่พบรายชื่อตามเงื่อนไข</td></tr>')+
+      (rows.length?"":'<tr><td colspan="'+cols+'" style="text-align:center;color:var(--faint);padding:22px">ไม่พบรายชื่อตามเงื่อนไข</td></tr>')+
       '</table></div>';
+    $$("#rsTable [data-reg]",body).forEach(function(b){ b.onclick=function(){ admEdit(b.dataset.reg); }; });
   }
   paint();
 }
-function printRoster(rows){
-  var area=$("#rosterPrintArea"); if(!area)return;
+function rsFilterTags(){
   var f=[];
   if(RS.rank)f.push("ยศ "+RS.rank); if(RS.tt)f.push("รุ่น ตท. "+RS.tt);
-  if(RS.ch)f.push("รุ่น ชนอ. "+RS.ch); if(RS.unit)f.push(RS.unit); if(RS.q)f.push('คำค้น "'+RS.q+'"');
+  if(RS.ch)f.push("รุ่น ชนอ. "+RS.ch); if(RS.unit)f.push(RS.unit);
+  if(RS.reg==="y")f.push("ลงทะเบียนแล้ว"); if(RS.reg==="n")f.push("ยังไม่ลงทะเบียน");
+  if(RS.q)f.push('คำค้น "'+RS.q+'"');
+  return f;
+}
+function printRoster(rows,reg){
+  var area=$("#rosterPrintArea"); if(!area)return;
+  var d=RS.detail, f=rsFilterTags();
+  var H=["ลำดับ","ยศ","ชื่อ","สกุล","รุ่น ตท.","รุ่น ชนอ.","สังกัด","ตำแหน่ง","ลงทะเบียน"]
+    .concat(d?["เบอร์โทร","กอล์ฟ","งานเลี้ยง","เสื้อ","สถานะชำระ","เช็คอิน"]:[]);
   area.innerHTML='<div style="padding:6px 0 14px"><h2 style="font-size:18px">คลังรายชื่อ ชนอ. · '+esc(CONFIG.EVENT_NAME)+'</h2>'+
     '<div style="color:#555;font-size:12px">'+(f.length?"ตัวกรอง: "+esc(f.join(" · "))+" · ":"")+'รวม '+rows.length+' คน · พิมพ์เมื่อ '+new Date().toLocaleString("th-TH")+'</div></div>'+
-    '<table class="grid"><tr><th>ลำดับ</th><th>ยศ</th><th>ชื่อ</th><th>สกุล</th><th>รุ่น ตท.</th><th>รุ่น ชนอ.</th><th>สังกัด</th><th>ตำแหน่ง</th></tr>'+
-    rows.map(function(r,i){return '<tr><td>'+(i+1)+'</td><td>'+esc(r.r||"")+'</td><td>'+esc(r.f||"")+'</td><td>'+esc(r.l||"")+'</td><td>'+esc(r.tt||"")+'</td><td>'+esc(r.ch||"")+'</td><td>'+esc(r.u||"")+'</td><td>'+esc(r.p||"")+'</td></tr>';}).join("")+
+    '<table class="grid"><tr>'+H.map(function(h){return '<th>'+esc(h)+'</th>';}).join("")+'</tr>'+
+    rows.map(function(r,i){
+      var x=reg[rsKey(r)];
+      var base=[i+1,r.r||"",r.f||"",r.l||"",r.tt||"",r.ch||"",r.u||"",r.p||"",x?"ใช่":"–"];
+      if(d) base=base.concat([
+        x?fmtPhone(x.phone):"–",
+        x&&x.joinGolf==="Y"?("เข้าร่วม"+(x.golfTravel==="รถบัส บน.2"?" (บัส)":"")):"–",
+        x&&x.joinDinner==="Y"?("เข้าร่วม"+(x.dinnerTravel==="รถบัส บน.2"?" (บัส)":"")):"–",
+        x&&x.ownShirtSize?(x.ownShirtSize+(+x.extraQty?" +"+x.extraQty:"")):"–",
+        rsMoneyText(x),
+        x?((x.checkinGolfAt?"กอล์ฟ ":"")+(x.checkinDinnerAt?"เลี้ยง":"")||"–"):"–"
+      ]);
+      return '<tr>'+base.map(function(cc){return '<td>'+esc(cc)+'</td>';}).join("")+'</tr>';
+    }).join("")+
     '</table>';
   area.classList.add("landscape");
   document.body.classList.add("printing-report");
   window.print();
   setTimeout(function(){ area.innerHTML=""; area.classList.remove("landscape"); document.body.classList.remove("printing-report"); },800);
+}
+/* Export Excel — คลัง ชนอ. + สถานะ/ข้อมูลการลงทะเบียนครบทุกคอลัมน์ (ตามตัวกรองที่เลือกอยู่) */
+function rsExport(rows,reg){
+  var H=["ลำดับ","ยศ","ชื่อ","สกุล","รุ่น ตท.","รุ่น ชนอ.","สังกัด","ตำแหน่ง","อยู่ในคลัง ชนอ.","สถานะลงทะเบียน","รหัสลงทะเบียน","เบอร์โทร","กอล์ฟ","เดินทาง(กอล์ฟ)","งานเลี้ยง","เดินทาง(งานเลี้ยง)","ไซซ์เสื้อ","เสื้อสั่งเพิ่ม","ยอดค้างชำระ","สถานะชำระเงิน","อาหารที่แพ้","เช็คอินกอล์ฟ","เช็คอินงานเลี้ยง","หมายเหตุ"];
+  var data=rows.map(function(r,i){
+    var x=reg[rsKey(r)];
+    return [
+      i+1, r.r||"", r.f||"", r.l||"", r.tt||"", r.ch||"", r.u||"", r.p||"",
+      r._extra?"ไม่":"ใช่",
+      x?"ลงทะเบียนแล้ว":"ยังไม่ลงทะเบียน",
+      x?x.regId:"", x?fmtPhone(x.phone):"",
+      x?(x.joinGolf==="Y"?"เข้าร่วม":"ไม่เข้าร่วม"):"", x?(x.golfTravel||""):"",
+      x?(x.joinDinner==="Y"?"เข้าร่วม":"ไม่เข้าร่วม"):"", x?(x.dinnerTravel||""):"",
+      x?(x.ownShirtSize||""):"", x?extrasText(x.extraShirts):"",
+      x?(+x.amountDue||0):"", x?(x.payStatus||""):"",
+      x?(x.allergy||""):"",
+      x&&x.checkinGolfAt?fmtTime(x.checkinGolfAt):"", x&&x.checkinDinnerAt?fmtTime(x.checkinDinnerAt):"",
+      x?(x.note||""):""
+    ];
+  });
+  exportXls("คลังรายชื่อ ชนอ. + สถานะลงทะเบียน",H,data);
 }
 
 /* ---- REPORTS / EXPORT ---- */
