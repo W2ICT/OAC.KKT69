@@ -354,6 +354,20 @@ table.grid td.act{display:flex;gap:6px}
 .listchips .fchip.clear{border-style:dashed;color:var(--gold-2)}
 .listchips .fchip.clear.on{border-style:solid}
 
+/* roster filter bar (dropdown filters) */
+.filterbar{display:grid;grid-template-columns:repeat(auto-fit,minmax(148px,1fr));gap:8px;margin-bottom:10px}
+.filterbar .fcol{display:flex;flex-direction:column;gap:4px}
+.filterbar .fcol label{font-size:10.5px;letter-spacing:.6px;color:var(--faint);font-weight:700;text-transform:uppercase}
+.filterbar .sel{padding:10px 11px;font-size:13.5px}
+.filterbar .sel.act{border-color:var(--gold);color:var(--gold-2)}
+.rosterbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.rosterbar .cnt{font-size:12.5px;color:var(--dim)}
+.rosterbar .cnt b{color:var(--gold-2)}
+.rosterbar .spacer{flex:1}
+.reg-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px;vertical-align:1px}
+.reg-dot.yes{background:var(--ok)}
+.reg-dot.no{background:var(--faint);opacity:.5}
+
 /* scanner */
 .scanwrap{position:relative;border-radius:16px;overflow:hidden;background:#000;aspect-ratio:1/1;max-width:360px;margin:0 auto}
 .scanwrap video{width:100%;height:100%;object-fit:cover}
@@ -385,9 +399,9 @@ table.grid td.act{display:flex;gap:6px}
 .toast.show{transform:translateX(-50%) translateY(0)}
 .toast.ok{border-color:rgba(95,185,142,.5)}
 .toast.bad{border-color:rgba(229,118,107,.5)}
-.modal-bg{position:fixed;inset:0;background:rgba(4,10,20,.7);backdrop-filter:blur(4px);z-index:150;display:none;align-items:center;justify-content:center;padding:18px}
-.modal-bg.open{display:flex;animation:fadein .2s both}
-.modal{background:linear-gradient(180deg,var(--card),var(--bg2));border:1px solid var(--line);border-radius:16px;padding:20px;max-width:440px;width:100%;box-shadow:var(--shadow);animation:pop .25s both}
+.modal-bg{position:fixed;inset:0;background:rgba(4,10,20,.7);backdrop-filter:blur(4px);z-index:150;display:none;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:18px}
+.modal-bg.open{display:flex;flex-direction:column;align-items:center;animation:fadein .2s both}
+.modal{background:linear-gradient(180deg,var(--card),var(--bg2));border:1px solid var(--line);border-radius:16px;padding:20px;max-width:440px;width:100%;margin:auto;box-shadow:var(--shadow);animation:pop .25s both}
 .modal h3{font-size:17px;margin-bottom:10px}
 .modal p{color:var(--dim);font-size:13.5px;margin-bottom:16px}
 
@@ -417,15 +431,16 @@ table.grid td.act{display:flex;gap:6px}
    เพราะเบราว์เซอร์/ไดรเวอร์ PDF บางตัวไม่ยึด @page margin ตามที่ตั้งไว้เสมอ */
 @media print{
   body.printing-report *{visibility:hidden!important}
-  body.printing-report #repPrintArea,body.printing-report #repPrintArea *{visibility:visible!important}
-  body.printing-report #repPrintArea{
+  body.printing-report #repPrintArea,body.printing-report #repPrintArea *,
+  body.printing-report #rosterPrintArea,body.printing-report #rosterPrintArea *{visibility:visible!important}
+  body.printing-report #repPrintArea,body.printing-report #rosterPrintArea{
     position:absolute;left:0;top:0;width:100%;display:block;
     padding:14mm 13mm;box-sizing:border-box;
   }
-  body.printing-report #repPrintArea.landscape{ page:landscape; }
+  body.printing-report #repPrintArea.landscape,body.printing-report #rosterPrintArea.landscape{ page:landscape; }
   body{background:#fff;color:#111}
   body::before,body::after{display:none}
-  .topbar,.btnrow,.no-print,.foot,.adm-tabs,.searchbar,.progress{display:none!important}
+  .topbar,.btnrow,.no-print,.foot,.adm-tabs,.searchbar,.progress,.filterbar,.listchips{display:none!important}
   .wrap{max-width:100%;width:100%;padding:14mm 13mm;box-sizing:border-box;margin:0}
   .print-only{display:block}
   .card,.panel,.ticket,.kpi{box-shadow:none;border-color:#ccc;background:#fff!important;color:#111}
@@ -1148,14 +1163,14 @@ function viewAdmin(app){
   if(!S.admin){ go("adminLogin"); return; }
   var head=el("div");
   head.innerHTML='<div class="adm-tabs" id="admTabs">'+
-    [["checkin","เช็คอินหน้างาน"],["dashboard","แดชบอร์ด"],["list","รายชื่อทั้งหมด"],["reports","รายงาน / Export"]]
+    [["checkin","เช็คอินหน้างาน"],["dashboard","แดชบอร์ด"],["list","รายชื่อทั้งหมด"],["roster","คลังรายชื่อ ชนอ."],["reports","รายงาน / Export"]]
     .map(function(t){return '<button data-t="'+t[0]+'" class="'+(S.admTab===t[0]?"on":"")+'">'+t[1]+'</button>';}).join("")+
     '</div><div id="admBody"></div>';
   app.appendChild(head);
   $$("#admTabs button",head).forEach(function(b){ b.onclick=function(){ S.admTab=b.dataset.t; render(); }; });
   var body=$("#admBody",head);
   if(!ADM.loaded){ body.innerHTML='<div class="center-pad"><div class="spin"></div>กำลังโหลดข้อมูล...</div>'; loadAdmin(body); return; }
-  ({checkin:admCheckin,dashboard:admDashboard,list:admList,reports:admReports}[S.admTab]||admCheckin)(body);
+  ({checkin:admCheckin,dashboard:admDashboard,list:admList,roster:admRoster,reports:admReports}[S.admTab]||admCheckin)(body);
 }
 function loadAdmin(body){
   api("list",{pass:CONFIG.ADMIN_PASS}).then(function(res){
@@ -1512,6 +1527,123 @@ function admDelete(regId){
       closeModal(); toast("ลบแล้ว","ok"); render();
     }).catch(function(e){toast(e.message,"bad");});
   };
+}
+
+/* ---- ROSTER · คลังรายชื่อ ชนอ. (สำหรับตรวจสอบหน้างาน) ---- */
+var RANK_ORDER=["พล.อ.อ.","พล.อ.ท.","พล.อ.ต.","น.อ.(พ)","น.อ.","น.ท.","น.ต.","ร.อ.","ร.ท.","ร.ต.","ว่าที่ น.อ.","ว่าที่ น.ท.","จ.อ."];
+function rankRank(r){ var i=RANK_ORDER.indexOf(String(r||"").trim()); return i<0?99:i; }
+var RS={ q:"", rank:"", tt:"", ch:"", unit:"", sort:"name" };
+function rosterRegMap(){
+  var m={};
+  (ADM.data||[]).forEach(function(x){
+    var k=((x.firstName||"")+"|"+(x.lastName||"")).trim().toLowerCase();
+    if(k!=="|") m[k]=1;
+  });
+  return m;
+}
+function admRoster(body){
+  var reg=rosterRegMap();
+  function keyOf(r){ return ((r.f||"")+"|"+(r.l||"")).trim().toLowerCase(); }
+  function distinct(key,numeric){
+    var seen={},out=[];
+    ROSTER.forEach(function(r){ var v=String(r[key]||"").trim(); if(v&&v!=="-"&&!seen[v]){seen[v]=1;out.push(v);} });
+    out.sort(numeric?function(a,b){return (+a||0)-(+b||0);}
+      :key==="r"?function(a,b){return rankRank(a)-rankRank(b)||a.localeCompare(b,"th");}
+      :function(a,b){return a.localeCompare(b,"th");});
+    return out;
+  }
+  function fcol(id,label,opts,val){
+    return '<div class="fcol"><label>'+esc(label)+'</label><select class="sel'+(val?" act":"")+'" id="'+id+'">'+
+      '<option value="">ทั้งหมด</option>'+
+      opts.map(function(o){return '<option value="'+esc(o)+'"'+(val===o?" selected":"")+'>'+esc(o)+'</option>';}).join("")+
+      '</select></div>';
+  }
+  var ranks=distinct("r"), tts=distinct("tt",true), chs=distinct("ch",true), units=distinct("u");
+
+  body.innerHTML=
+    '<div class="panel"><h3>คลังรายชื่อ ชนอ. — ฐานข้อมูลทั้งหมด ('+ROSTER.length+' คน)'+
+      '<div class="exp"><button class="mini" id="rsPrint">🖨 พิมพ์ / PDF</button></div></h3>'+
+    '<div style="font-size:12px;color:var(--faint);margin:0 0 12px">รายชื่อทุกคนในระบบ ไว้ค้น/ตรวจสอบหน้างาน &nbsp;·&nbsp; '+
+      '<span class="reg-dot yes"></span>ลงทะเบียนแล้ว &nbsp;&nbsp; <span class="reg-dot no"></span>ยังไม่ลงทะเบียน</div>'+
+    '<div class="searchbar"><input class="inp" id="rsQ" placeholder="ค้นหา ยศ / ชื่อ / สกุล / รุ่น / สังกัด / ตำแหน่ง" value="'+esc(RS.q)+'"></div>'+
+    '<div class="filterbar">'+
+      fcol("rsRank","ยศ",ranks,RS.rank)+
+      fcol("rsTt","รุ่น ตท.",tts,RS.tt)+
+      fcol("rsCh","รุ่น ชนอ./นนอ.",chs,RS.ch)+
+      fcol("rsUnit","สังกัด",units,RS.unit)+
+      '<div class="fcol"><label>เรียงตาม</label><select class="sel" id="rsSort">'+
+        [["name","ชื่อ"],["rank","ยศ"],["tt","รุ่น ตท."],["ch","รุ่น ชนอ."],["unit","สังกัด"]]
+        .map(function(o){return '<option value="'+o[0]+'"'+(RS.sort===o[0]?" selected":"")+'>'+o[1]+'</option>';}).join("")+
+      '</select></div>'+
+    '</div>'+
+    '<div class="rosterbar"><span class="cnt" id="rsCount"></span><span class="spacer"></span>'+
+      '<button class="mini" id="rsClear">ล้างตัวกรอง</button></div>'+
+    '<div id="rsTable"></div></div>'+
+    '<div id="rosterPrintArea" class="print-only"></div>';
+
+  var qi=$("#rsQ",body);
+  qi.oninput=function(){ RS.q=qi.value.trim(); paint(); };
+  [["rsRank","rank"],["rsTt","tt"],["rsCh","ch"],["rsUnit","unit"]].forEach(function(p){
+    var e=$("#"+p[0],body); e.onchange=function(){ RS[p[1]]=e.value; paint(); };
+  });
+  $("#rsSort",body).onchange=function(){ RS.sort=this.value; paint(); };
+  $("#rsClear",body).onclick=function(){ RS.q="";RS.rank="";RS.tt="";RS.ch="";RS.unit="";RS.sort="name"; render(); };
+  $("#rsPrint",body).onclick=function(){ printRoster(computeRows()); };
+
+  function computeRows(){
+    var q=RS.q.toLowerCase();
+    var rows=ROSTER.filter(function(r){
+      if(RS.rank && String(r.r||"").trim()!==RS.rank) return false;
+      if(RS.tt   && String(r.tt||"").trim()!==RS.tt) return false;
+      if(RS.ch   && String(r.ch||"").trim()!==RS.ch) return false;
+      if(RS.unit && String(r.u||"").trim()!==RS.unit) return false;
+      if(q){ var hay=(r.r+" "+r.f+" "+r.l+" "+r.tt+" "+r.ch+" "+r.u+" "+(r.p||"")).toLowerCase(); if(hay.indexOf(q)<0) return false; }
+      return true;
+    });
+    var by=RS.sort;
+    rows.sort(function(a,b){
+      if(by==="rank") return rankRank(a.r)-rankRank(b.r) || (a.f||"").localeCompare(b.f||"","th");
+      if(by==="tt")   return (+a.tt||0)-(+b.tt||0) || (a.f||"").localeCompare(b.f||"","th");
+      if(by==="ch")   return (+a.ch||0)-(+b.ch||0) || (a.f||"").localeCompare(b.f||"","th");
+      if(by==="unit") return (a.u||"").localeCompare(b.u||"","th") || rankRank(a.r)-rankRank(b.r) || (a.f||"").localeCompare(b.f||"","th");
+      return (a.f||"").localeCompare(b.f||"","th") || (a.l||"").localeCompare(b.l||"","th");
+    });
+    return rows;
+  }
+  function paint(){
+    var rows=computeRows();
+    $$(".filterbar .sel",body).forEach(function(s){ if(s.id!=="rsSort") s.classList.toggle("act",!!s.value); });
+    var regN=rows.reduce(function(a,r){return a+(reg[keyOf(r)]?1:0);},0);
+    var c=$("#rsCount",body);
+    if(c) c.innerHTML='แสดง <b>'+rows.length+'</b> / '+ROSTER.length+' คน · ลงทะเบียนแล้ว <b>'+regN+'</b>';
+    $("#rsTable",body).innerHTML='<div class="tablescroll"><table class="grid"><tr>'+
+      '<th></th><th>ยศ</th><th>ชื่อ</th><th>สกุล</th><th>รุ่น ตท.</th><th>รุ่น ชนอ.</th><th>สังกัด</th><th>ตำแหน่ง</th></tr>'+
+      rows.map(function(r){
+        var isReg=!!reg[keyOf(r)];
+        return '<tr><td><span class="reg-dot '+(isReg?"yes":"no")+'" title="'+(isReg?"ลงทะเบียนแล้ว":"ยังไม่ลงทะเบียน")+'"></span></td>'+
+          '<td>'+esc(r.r||"-")+'</td><td>'+esc(r.f||"-")+'</td><td>'+esc(r.l||"-")+'</td>'+
+          '<td>'+esc(r.tt||"-")+'</td><td>'+esc(r.ch||"-")+'</td>'+
+          '<td>'+esc(r.u||"-")+'</td><td>'+esc(r.p||"-")+'</td></tr>';
+      }).join("")+
+      (rows.length?"":'<tr><td colspan="8" style="text-align:center;color:var(--faint);padding:22px">ไม่พบรายชื่อตามเงื่อนไข</td></tr>')+
+      '</table></div>';
+  }
+  paint();
+}
+function printRoster(rows){
+  var area=$("#rosterPrintArea"); if(!area)return;
+  var f=[];
+  if(RS.rank)f.push("ยศ "+RS.rank); if(RS.tt)f.push("รุ่น ตท. "+RS.tt);
+  if(RS.ch)f.push("รุ่น ชนอ. "+RS.ch); if(RS.unit)f.push(RS.unit); if(RS.q)f.push('คำค้น "'+RS.q+'"');
+  area.innerHTML='<div style="padding:6px 0 14px"><h2 style="font-size:18px">คลังรายชื่อ ชนอ. · '+esc(CONFIG.EVENT_NAME)+'</h2>'+
+    '<div style="color:#555;font-size:12px">'+(f.length?"ตัวกรอง: "+esc(f.join(" · "))+" · ":"")+'รวม '+rows.length+' คน · พิมพ์เมื่อ '+new Date().toLocaleString("th-TH")+'</div></div>'+
+    '<table class="grid"><tr><th>ลำดับ</th><th>ยศ</th><th>ชื่อ</th><th>สกุล</th><th>รุ่น ตท.</th><th>รุ่น ชนอ.</th><th>สังกัด</th><th>ตำแหน่ง</th></tr>'+
+    rows.map(function(r,i){return '<tr><td>'+(i+1)+'</td><td>'+esc(r.r||"")+'</td><td>'+esc(r.f||"")+'</td><td>'+esc(r.l||"")+'</td><td>'+esc(r.tt||"")+'</td><td>'+esc(r.ch||"")+'</td><td>'+esc(r.u||"")+'</td><td>'+esc(r.p||"")+'</td></tr>';}).join("")+
+    '</table>';
+  area.classList.add("landscape");
+  document.body.classList.add("printing-report");
+  window.print();
+  setTimeout(function(){ area.innerHTML=""; area.classList.remove("landscape"); document.body.classList.remove("printing-report"); },800);
 }
 
 /* ---- REPORTS / EXPORT ---- */
