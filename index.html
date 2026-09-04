@@ -340,6 +340,20 @@ table.grid td.act{display:flex;gap:6px}
 .searchbar{display:flex;gap:8px;margin-bottom:12px}
 .searchbar .inp{flex:1}
 
+/* list filter chips */
+.listchips{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:12px}
+.listchips .fchip{
+  border:1px solid var(--line-soft);background:rgba(255,255,255,.03);color:var(--dim);
+  padding:7px 12px;border-radius:999px;cursor:pointer;font-size:12px;font-weight:600;
+  transition:.15s;display:flex;align-items:center;gap:6px;white-space:nowrap;user-select:none;
+}
+.listchips .fchip:hover{border-color:var(--line);color:var(--text)}
+.listchips .fchip.on{background:linear-gradient(120deg,var(--gold),var(--gold-2));color:#241c07;border-color:transparent}
+.listchips .fchip .c{background:rgba(4,12,24,.16);border-radius:999px;padding:0 6px;font-size:10.5px;min-width:16px;text-align:center;font-weight:700}
+.listchips .fchip.on .c{background:rgba(0,0,0,.15)}
+.listchips .fchip.clear{border-style:dashed;color:var(--gold-2)}
+.listchips .fchip.clear.on{border-style:solid}
+
 /* scanner */
 .scanwrap{position:relative;border-radius:16px;overflow:hidden;background:#000;aspect-ratio:1/1;max-width:360px;margin:0 auto}
 .scanwrap video{width:100%;height:100%;object-fit:cover}
@@ -1375,21 +1389,62 @@ function donut(parts){
 }
 
 /* ---- LIST / EDIT ---- */
+/* ปุ่มกรอง: [key, ป้าย, ฟังก์ชันเงื่อนไข] — เลือกหลายปุ่มพร้อมกัน = ต้องเข้าเงื่อนไขครบทุกปุ่ม (AND) */
+var LIST_CHIPS=[
+  ["golf","⛳ เข้าร่วมกอล์ฟ",function(r){return r.joinGolf==="Y";}],
+  ["dinner","🍽 เข้าร่วมงานเลี้ยง",function(r){return r.joinDinner==="Y";}],
+  ["golfbus","🚌 รถบัส · รอบกอล์ฟ",function(r){return r.joinGolf==="Y"&&r.golfTravel==="รถบัส บน.2";}],
+  ["dinnerbus","🚌 รถบัส · รอบงานเลี้ยง",function(r){return r.joinDinner==="Y"&&r.dinnerTravel==="รถบัส บน.2";}],
+  ["anybus","🚌 ขึ้นรถบัส (รอบใดก็ได้)",function(r){return (r.joinGolf==="Y"&&r.golfTravel==="รถบัส บน.2")||(r.joinDinner==="Y"&&r.dinnerTravel==="รถบัส บน.2");}],
+  ["own","🚗 เดินทางเอง (ทุกรอบที่เข้าร่วม)",function(r){var g=r.joinGolf!=="Y"||r.golfTravel==="รถส่วนตัว",d=r.joinDinner!=="Y"||r.dinnerTravel==="รถส่วนตัว";return (r.joinGolf==="Y"||r.joinDinner==="Y")&&g&&d;}],
+  ["shirt","👕 สั่งเสื้อ",function(r){return !!(r.ownShirtSize||parseExtras(r.extraShirts).length);}],
+  ["unpaid","฿ ค้างชำระ",function(r){return +r.amountDue>0 && r.payStatus!=="ชำระแล้ว";}],
+  ["allergy","⚠ แพ้อาหาร",function(r){return !!r.allergy;}],
+  ["nocheckin","● ยังไม่เช็คอิน",function(r){return !r.checkinGolfAt && !r.checkinDinnerAt;}]
+];
 function admList(body){
-  body.innerHTML='<div class="panel"><h3>รายชื่อผู้ลงทะเบียน ('+ADM.data.length+')<div class="exp">'+
+  ADM.chips = ADM.chips || [];
+  body.innerHTML='<div class="panel"><h3>รายชื่อผู้ลงทะเบียน (<span id="lCount">'+ADM.data.length+'</span>)<div class="exp">'+
       '<button class="mini" id="lRefresh">↻ รีเฟรช</button></div></h3>'+
     '<div class="searchbar"><input class="inp" id="lSearch" placeholder="ค้นหา ชื่อ / เบอร์ / สังกัด / รหัส" value="'+esc(ADM.filter)+'"></div>'+
+    '<div class="listchips" id="lChips"></div>'+
     '<div id="lTable"></div></div>';
   $("#lRefresh",body).onclick=function(){this.textContent="...";refreshAdmin(function(){render();});};
   var s=$("#lSearch",body); s.oninput=function(){ ADM.filter=s.value.trim(); paintTable(); };
-  paintTable();
+  paintChips(); paintTable();
+
+  function chipMatch(r){
+    return LIST_CHIPS.every(function(d){
+      return ADM.chips.indexOf(d[0])<0 || d[2](r);
+    });
+  }
+  function paintChips(){
+    var box=$("#lChips",body); if(!box)return;
+    var html='<div class="fchip clear'+(ADM.chips.length?"":" on")+'" data-k="__all">ทั้งหมด</div>';
+    html+=LIST_CHIPS.map(function(d){
+      var n=ADM.data.filter(d[2]).length, on=ADM.chips.indexOf(d[0])>=0;
+      return '<div class="fchip'+(on?" on":"")+'" data-k="'+d[0]+'">'+esc(d[1])+'<span class="c">'+n+'</span></div>';
+    }).join("");
+    box.innerHTML=html;
+    $$(".fchip",box).forEach(function(c){
+      c.onclick=function(){
+        var k=c.dataset.k;
+        if(k==="__all"){ ADM.chips=[]; }
+        else { var i=ADM.chips.indexOf(k); if(i>=0)ADM.chips.splice(i,1); else ADM.chips.push(k); }
+        paintChips(); paintTable();
+      };
+    });
+  }
   function paintTable(){
     var q=ADM.filter.toLowerCase(), qd=digits(ADM.filter);
     var rows=ADM.data.filter(function(r){
+      if(!chipMatch(r))return false;
       if(!q)return true;
       return fullName(r).toLowerCase().indexOf(q)>=0 || String(r.unit||"").toLowerCase().indexOf(q)>=0
         || String(r.regId||"").toLowerCase().indexOf(q)>=0 || (qd&&digits(r.phone).indexOf(qd)>=0);
     });
+    var cnt=$("#lCount",body);
+    if(cnt) cnt.textContent = rows.length===ADM.data.length ? String(ADM.data.length) : rows.length+" / "+ADM.data.length;
     $("#lTable",body).innerHTML='<div class="tablescroll"><table class="grid"><tr>'+
       '<th>รหัส</th><th>ชื่อ</th><th>สังกัด</th><th>เบอร์</th><th>กอล์ฟ</th><th>เลี้ยง</th><th>เสื้อ</th><th>เงิน</th><th>เช็คอิน</th><th></th></tr>'+
       rows.map(function(r){
@@ -1400,7 +1455,9 @@ function admList(body){
           '<td>'+(+r.amountDue>0?(r.payStatus==="ชำระแล้ว"?'<span class="badge ok">จ่าย</span>':'<span class="badge bad">'+thb(r.amountDue)+'</span>'):"–")+'</td>'+
           '<td>'+(r.checkinGolfAt?"⛳":"")+(r.checkinDinnerAt?"🍽":"")+(!r.checkinGolfAt&&!r.checkinDinnerAt?"–":"")+'</td>'+
           '<td class="act"><button class="rowbtn" data-e="'+esc(r.regId)+'">แก้ไข</button><button class="rowbtn danger" data-d="'+esc(r.regId)+'">ลบ</button></td></tr>';
-      }).join("")+'</table></div>';
+      }).join("")+
+      (rows.length?"":'<tr><td colspan="10" style="text-align:center;color:var(--faint);padding:22px">ไม่พบรายชื่อตามเงื่อนไขที่เลือก</td></tr>')+
+      '</table></div>';
     $$("#lTable [data-e]",body).forEach(function(b){b.onclick=function(){admEdit(b.dataset.e);};});
     $$("#lTable [data-d]",body).forEach(function(b){b.onclick=function(){admDelete(b.dataset.d);};});
   }
