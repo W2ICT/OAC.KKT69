@@ -2072,12 +2072,17 @@
     });
   }
 
+  function goOffline(){
+    loadLocalFallback();
+    loadNewPeopleLocal();
+    setConn("offline");
+    renderAll();
+  }
+
   function init(){
     var hasFirebase = !!(window.firebase && window.firebase.firestore && FIREBASE_CONFIG && FIREBASE_CONFIG.projectId);
     if(!hasFirebase){
-      loadLocalFallback();
-      setConn("offline");
-      renderAll();
+      goOffline();
       return;
     }
 
@@ -2092,18 +2097,15 @@
         seedFirestoreIfEmpty(snap);
       }, function(err){
         console.error("db subscription error", err);
-        setConn("offline");
+        goOffline();
       });
       renderAll();
     } catch(err){
       console.error("firebase init failed", err);
-      loadLocalFallback();
-      setConn("offline");
-      renderAll();
+      goOffline();
     }
   }
 
-  loadNewPeopleLocal();
   renderAll();
   init();
 })();
