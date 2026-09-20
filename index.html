@@ -248,6 +248,18 @@
   .checkin-btn:active{ transform:scale(0.96); }
   .checkin-btn[disabled]{ opacity:.6; cursor:wait; }
   .roster-time{ font-size:10.5px; color:var(--text-dim); margin-top:2px; text-align:right; }
+  .delete-btn{
+    flex:none; border:none; cursor:pointer; border-radius:10px; padding:7px 12px;
+    font-size:12px; font-weight:700; font-family:inherit;
+    background:var(--danger-bg); color:var(--danger); border:1px solid var(--danger);
+    min-width:96px; margin-top:6px;
+  }
+  .delete-btn:active{ transform:scale(0.96); }
+  .code-input{
+    width:100%; box-sizing:border-box; background:var(--surface); border:1.5px solid var(--border-strong); color:var(--text);
+    border-radius:10px; padding:11px 13px; font-size:20px; font-family:inherit; text-align:center; letter-spacing:0.3em;
+  }
+  .code-input:focus{ outline:none; border-color:var(--danger); }
 
   /* ---- Planning table ---- */
   .plan-legend{ display:flex; flex-wrap:wrap; gap:14px; align-items:center; font-size:11.5px; color:var(--text-dim); margin-bottom:12px; }
@@ -458,6 +470,7 @@
     content:"แตะเพื่อแจก"; position:absolute; bottom:10px; left:6px; right:6px;
     font-size:10.5px; color:var(--text-dim); font-weight:600;
   }
+  .shirt-tag-btn .tag-stars{ font-size:15px; letter-spacing:3px; color:var(--accent); line-height:1; }
   .shirt-tag-btn .tag-name{ font-weight:700; font-size:13px; line-height:1.35; }
   .shirt-tag-btn .tag-batch{ font-size:11px; color:var(--text-dim); background:var(--surface-2); border:1px solid var(--border); border-radius:999px; padding:2px 10px; font-variant-numeric:tabular-nums; }
   .shirt-tag-btn .tag-size{ font-family:"Sarabun",sans-serif; font-weight:800; font-size:32px; color:var(--accent); line-height:1; }
@@ -548,6 +561,13 @@
         </div>
       </div>
 
+      <div class="directory-export">
+        <span class="directory-export-label">📇 ส่งออกข้อมูลกอล์ฟ (ยศ ชื่อ นามสกุล ชื่อเล่น รุ่นนตท./ชนอ. เบอร์ สังกัด เดินทาง เช็คอิน)</span>
+        <div class="directory-export-btns">
+          <button class="btn" id="golfExportExcelBtn">📊 Excel</button>
+        </div>
+      </div>
+
       <button class="btn primary add-person-btn" id="golfAddPersonBtn" type="button">➕ เพิ่มชื่อที่ไม่มีในระบบ (ตกหล่น)</button>
 
       <div id="golfKiosk"></div>
@@ -608,8 +628,16 @@
         <div class="big num" id="shirtSummaryText">0 / 0</div>
         <div class="track progress-track"><div class="progress-fill" id="shirtProgressFill" style="width:0%"></div></div>
       </div>
+      <div class="directory-export">
+        <span class="directory-export-label">📇 ส่งออกข้อมูลแจกเสื้อ (ยศ ชื่อ นามสกุล ชื่อเล่น รุ่นนตท./ชนอ. สังกัด ไซซ์ สั่งเพิ่ม สถานะแจก)</span>
+        <div class="directory-export-btns">
+          <button class="btn" id="shirtExportExcelBtn">📊 Excel</button>
+        </div>
+      </div>
+
       <button class="btn primary add-person-btn" id="shirtAddPersonBtn" type="button">➕ เพิ่มชื่อที่ไม่มีในระบบ (ตกหล่น)</button>
       <div class="size-tabs" id="shirtSizeTabs"></div>
+      <div class="size-tabs" id="shirtStarTabs"></div>
       <div class="controls-row">
         <input class="search-input" id="shirtSearch" type="text" placeholder="ค้นหาชื่อ, รหัส, สังกัด, เบอร์โทร…">
         <label class="toggle-chip"><input type="checkbox" id="shirtHideDone"> ซ่อนคนที่แจกแล้ว</label>
@@ -729,6 +757,22 @@
       </div>
     </div>
   </div>
+
+  <div class="modal-overlay" id="deleteConfirmModal" hidden>
+    <div class="modal-card">
+      <h3>🗑 ยืนยันการลบ</h3>
+      <div class="sub" id="deleteConfirmSub">กำลังจะลบรายชื่อออกจากระบบ — การลบไม่สามารถย้อนกลับได้ กรุณากรอกรหัสยืนยันเพื่อดำเนินการต่อ</div>
+      <div class="form-field">
+        <label for="deleteConfirmCode">รหัสยืนยัน</label>
+        <input class="code-input" type="password" id="deleteConfirmCode" inputmode="numeric" placeholder="••••" maxlength="10">
+      </div>
+      <div class="form-error" id="deleteConfirmError" hidden>รหัสไม่ถูกต้อง กรุณาลองใหม่</div>
+      <div class="modal-actions">
+        <button class="btn" id="deleteConfirmCancelBtn" type="button">ยกเลิก</button>
+        <button class="btn primary" id="deleteConfirmSubmitBtn" type="button" style="background:var(--danger);border-color:var(--danger);color:#fff;">🗑 ยืนยันลบ</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -764,7 +808,7 @@
     tab: "overview",
     golfSearch: "", golfHideDone: false,
     dinnerSearch: "", dinnerHideDone: false,
-    shirtSearch: "", shirtSizeFilter: "", shirtHideDone: false,
+    shirtSearch: "", shirtSizeFilter: "", shirtStarFilter: "", shirtHideDone: false,
     planSearch: "", planUnit: "", planActivity: "", planExpanded: {},
     pendingIds: {},
     golfMode: "kiosk", dinnerMode: "kiosk",
@@ -780,6 +824,8 @@
     });
   }
   function fullName(a){ return (a.rank ? a.rank + " " : "") + a.name + (a.nickname ? " (" + a.nickname + ")" : ""); }
+  var RANK_STARS = { "พล.อ.ต.": "★★", "พล.อ.ท.": "★★★", "พล.อ.อ.": "★★★★" };
+  function rankStars(rank){ return RANK_STARS[rank] || ""; }
   function fmtTime(iso){
     if(!iso) return "";
     try{
@@ -989,6 +1035,7 @@
           (a.position ? '<div class="mt">' + esc(a.position) + '</div>' : '') +
           (a.phone && a.phone.trim() ? '<div class="mt">เบอร์: ' + esc(a.phone) + '</div>' : '') +
           (a[transField] ? '<div class="mt">การเดินทาง: ' + esc(a[transField]) + '</div>' : '') +
+          (activity === "dinner" && a.shirtSize && a.shirtSize.trim() ? '<div class="mt">👕 รับเสื้อไซซ์ ' + esc(a.shirtSize) + (a.shirtCollected ? ' (รับแล้ว)' : ' ที่นี่ด้วย') + '</div>' : '') +
           (isDone ? '<div class="mt">เช็คอินแล้วเมื่อ ' + esc(fmtTime(a[timeField])) + '</div>' : '') +
           (hasAllergy ? '<div class="warn">⚠ ข้อควรระวังอาหาร: ' + esc(a.allergy) + '</div>' : '') +
           (needsPhone ?
@@ -1141,12 +1188,14 @@
             '<span class="chip">รุ่น ' + esc(a.ntBatch || "-") + '</span>' +
             '<span class="chip">' + esc(a.unit) + '</span>' +
             (a[transField] ? '<span class="chip">' + esc(a[transField]) + '</span>' : '') +
+            (activity === "dinner" && a.shirtSize && a.shirtSize.trim() ? '<span class="chip">👕 ' + esc(a.shirtSize) + (a.shirtCollected ? ' รับแล้ว' : '') + '</span>' : '') +
             (a.allergy && a.allergy.trim() && a.allergy.trim() !== "-" ? '<span class="chip" style="color:var(--danger)">⚠ ' + esc(a.allergy) + '</span>' : '') +
           '</div>' +
         '</div>' +
         '<div>' +
           '<button class="checkin-btn' + (isDone ? ' done' : '') + '" data-id="' + esc(a.id) + '" data-activity="' + activity + '"' + (pending ? ' disabled' : '') + '>' + (isDone ? '✓ เช็คอินแล้ว' : "เช็คอิน") + '</button>' +
           (isDone && a[timeField] ? '<div class="roster-time">' + esc(fmtTime(a[timeField])) + '</div>' : '') +
+          (activity === "golf" ? '<button class="delete-btn" data-role="delete-person" data-id="' + esc(a.id) + '" type="button">🗑 ลบ</button>' : '') +
         '</div>' +
       '</div>';
     }).join("") : '<div class="empty-note">ไม่พบรายชื่อที่ตรงกับเงื่อนไข</div>';
@@ -1163,8 +1212,13 @@
   function toggleCheckin(id, activity, extraPatch){
     var a = state.attendees.find(function(x){ return x.id === id; });
     var patch = extraPatch ? Object.assign({}, extraPatch) : {};
-    if(activity === "dinner" && a && !a[activity + "CheckedIn"] && !a.dinner){
+    var isCheckingIn = a && !a[activity + "CheckedIn"];
+    if(activity === "dinner" && isCheckingIn && !a.dinner){
       patch.dinner = true;
+    }
+    if(activity === "dinner" && isCheckingIn && a.shirtSize && a.shirtSize.trim() && !a.shirtCollected){
+      patch.shirtCollected = true;
+      patch.shirtCollectedAt = new Date().toISOString();
     }
     toggleField(id, activity, activity + "CheckedIn", activity + "CheckedInAt", patch);
   }
@@ -1246,9 +1300,33 @@
         '</button>';
       }).join("");
 
+    var byStar = {};
+    needList.forEach(function(a){
+      var st = rankStars(a.rank) || "ไม่มีดาว";
+      if(!byStar[st]) byStar[st] = { total: 0, done: 0 };
+      byStar[st].total++;
+      if(a.shirtCollected) byStar[st].done++;
+    });
+    var STAR_ORDER = ["★★","★★★","★★★★","ไม่มีดาว"];
+    var allStarActive = !state.shirtStarFilter;
+    byId("shirtStarTabs").innerHTML =
+      '<button class="size-tab all' + (allStarActive ? ' active' : '') + '" data-role="star-tab" data-star="">' +
+        '<span class="sz">ทุกกรุ๊ปดาว</span><span class="cnt num">' + (total - done) + '/' + total + '</span>' +
+      '</button>' +
+      STAR_ORDER.filter(function(k){ return byStar[k]; }).map(function(k){
+        var g = byStar[k];
+        var remain = g.total - g.done;
+        var complete = remain === 0;
+        var active = state.shirtStarFilter === k;
+        return '<button class="size-tab' + (complete ? ' complete' : '') + (active ? ' active' : '') + '" data-role="star-tab" data-star="' + esc(k) + '">' +
+          '<span class="sz">' + esc(k) + '</span><span class="cnt num">' + remain + '/' + g.total + '</span>' +
+        '</button>';
+      }).join("");
+
     var q = state.shirtSearch.trim().toLowerCase();
     var list = needList.slice();
     if(state.shirtSizeFilter){ list = list.filter(function(a){ return a.shirtSize.trim() === state.shirtSizeFilter; }); }
+    if(state.shirtStarFilter){ list = list.filter(function(a){ return (rankStars(a.rank) || "ไม่มีดาว") === state.shirtStarFilter; }); }
     if(q){
       list = list.filter(function(a){
         var hay = (fullName(a) + " " + a.id + " " + a.unit + " " + a.phone + " " + a.ntBatch).toLowerCase();
@@ -1271,7 +1349,9 @@
       var pending = !!state.pendingIds[a.id + ":shirt"];
       var hasExtra = a.extraOrder && a.extraOrder.trim();
       var unpaid = a.paymentStatus === "รอชำระ";
+      var stars = rankStars(a.rank);
       return '<button class="shirt-tag-btn checkin-btn' + (isDone ? ' done' : '') + '" data-id="' + esc(a.id) + '" data-activity="shirt"' + (pending ? ' disabled' : '') + '>' +
+        (stars ? '<span class="tag-stars">' + stars + '</span>' : '') +
         '<span class="tag-name">' + esc(fullName(a)) + '</span>' +
         '<span class="tag-batch">รุ่น นตท. ' + esc(a.ntBatch || "-") + '</span>' +
         '<span class="tag-size">' + esc(a.shirtSize || "-") + '</span>' +
@@ -1284,9 +1364,16 @@
   byId("shirtSearch").addEventListener("input", function(e){ state.shirtSearch = e.target.value; renderShirtTab(); });
   document.addEventListener("click", function(e){
     var sizeTab = e.target.closest('[data-role="size-tab"]');
-    if(!sizeTab) return;
-    state.shirtSizeFilter = sizeTab.getAttribute("data-size");
-    renderShirtTab();
+    if(sizeTab){
+      state.shirtSizeFilter = sizeTab.getAttribute("data-size");
+      renderShirtTab();
+      return;
+    }
+    var starTab = e.target.closest('[data-role="star-tab"]');
+    if(starTab){
+      state.shirtStarFilter = starTab.getAttribute("data-star");
+      renderShirtTab();
+    }
   });
   byId("shirtHideDone").addEventListener("change", function(e){ state.shirtHideDone = e.target.checked; renderShirtTab(); });
 
@@ -1618,6 +1705,74 @@
     openPrintWindow('OAC KKT Reunion Day — ทำเนียบรุ่น', fullHtml);
   }
 
+  function downloadWorkbook(wb, filename){
+    var wbout = XLSX.write(wb, {bookType:"xlsx", type:"array"});
+    var blob = new Blob([wbout], {type:"application/octet-stream"});
+    if(state.downloads){
+      state.downloads.save({ filename: filename, data: blob }).catch(function(err){
+        console.error("excel download failed", err);
+      });
+    } else {
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement("a");
+      a.href = url; a.download = filename;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      setTimeout(function(){ URL.revokeObjectURL(url); }, 2000);
+    }
+  }
+
+  function exportGolfExcel(){
+    if(typeof XLSX === "undefined"){
+      alert("โหลดไลบรารี Excel ไม่สำเร็จ ลองรีโหลดหน้านี้แล้วลองใหม่");
+      return;
+    }
+    var list = state.attendees.filter(function(a){ return a.golf; }).slice();
+    list.sort(function(a,b){
+      var ba = a.ntBatch && a.ntBatch.trim() ? parseInt(a.ntBatch,10) : NaN;
+      var bb = b.ntBatch && b.ntBatch.trim() ? parseInt(b.ntBatch,10) : NaN;
+      var na = isNaN(ba), nb = isNaN(bb);
+      if(na !== nb) return na ? 1 : -1;
+      if(!na && ba !== bb) return ba - bb;
+      return fullName(a).localeCompare(fullName(b), "th");
+    });
+    var header = ["รหัส","ยศ","ชื่อ","นามสกุล","ชื่อเล่น","รุ่น นตท.","รุ่น ชนอ.","สังกัด","เบอร์ติดต่อ","การเดินทาง","เช็คอินแล้ว","เวลาเช็คอิน"];
+    var aoa = [header].concat(list.map(function(a){
+      var n = splitName(a);
+      return [a.id, a.rank || "", n.first, n.last, a.nickname || "", a.ntBatch || "", a.batch || "", a.unit || "", a.phone || "", a.golfTransport || "", a.golfCheckedIn ? "เช็คอินแล้ว" : "", a.golfCheckedIn ? fmtTime(a.golfCheckedInAt) : ""];
+    }));
+    var ws = XLSX.utils.aoa_to_sheet(aoa);
+    ws["!cols"] = [{wch:12},{wch:10},{wch:16},{wch:20},{wch:12},{wch:9},{wch:9},{wch:16},{wch:14},{wch:14},{wch:12},{wch:16}];
+    var wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "กอล์ฟ");
+    downloadWorkbook(wb, "oac-kkt-golf.xlsx");
+  }
+
+  function exportShirtExcel(){
+    if(typeof XLSX === "undefined"){
+      alert("โหลดไลบรารี Excel ไม่สำเร็จ ลองรีโหลดหน้านี้แล้วลองใหม่");
+      return;
+    }
+    var list = shirtNeedList().slice();
+    list.sort(function(a,b){
+      var ba = a.ntBatch && a.ntBatch.trim() ? parseInt(a.ntBatch,10) : NaN;
+      var bb = b.ntBatch && b.ntBatch.trim() ? parseInt(b.ntBatch,10) : NaN;
+      var na = isNaN(ba), nb = isNaN(bb);
+      if(na !== nb) return na ? 1 : -1;
+      if(!na && ba !== bb) return ba - bb;
+      return fullName(a).localeCompare(fullName(b), "th");
+    });
+    var header = ["รหัส","ยศ","ชื่อ","นามสกุล","ชื่อเล่น","หมายเหตุยศ","รุ่น นตท.","รุ่น ชนอ.","สังกัด","ไซซ์เสื้อ","สั่งเพิ่ม","แจกแล้ว","เวลาแจก"];
+    var aoa = [header].concat(list.map(function(a){
+      var n = splitName(a);
+      return [a.id, a.rank || "", n.first, n.last, a.nickname || "", rankStars(a.rank), a.ntBatch || "", a.batch || "", a.unit || "", a.shirtSize || "", a.extraOrder || "", a.shirtCollected ? "แจกแล้ว" : "", a.shirtCollected ? fmtTime(a.shirtCollectedAt) : ""];
+    }));
+    var ws = XLSX.utils.aoa_to_sheet(aoa);
+    ws["!cols"] = [{wch:12},{wch:10},{wch:16},{wch:20},{wch:12},{wch:10},{wch:9},{wch:9},{wch:16},{wch:9},{wch:10},{wch:10},{wch:16}];
+    var wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "แจกเสื้อ");
+    downloadWorkbook(wb, "oac-kkt-shirt.xlsx");
+  }
+
   /* ---------------- Wire up controls ---------------- */
   byId("golfSearch").addEventListener("input", function(e){ state.golfSearch = e.target.value; renderStaffRoster("golf"); });
   byId("golfHideDone").addEventListener("change", function(e){ state.golfHideDone = e.target.checked; renderStaffRoster("golf"); });
@@ -1630,6 +1785,8 @@
   byId("printSheetBtn").addEventListener("click", printChecklist);
   byId("dinnerExportExcelBtn").addEventListener("click", exportDirectoryExcel);
   byId("dinnerExportPdfBtn").addEventListener("click", exportDirectoryPdf);
+  byId("golfExportExcelBtn").addEventListener("click", exportGolfExcel);
+  byId("shirtExportExcelBtn").addEventListener("click", exportShirtExcel);
 
   /* ---------------- Add missing person (golf / dinner / shirt tabs) ---------------- */
   var AP_COPY = {
@@ -1733,6 +1890,57 @@
     if(e.target.id === "addPersonModal") closeAddPersonModal();
   });
 
+  /* ---------------- Delete person (golf tab, code-gated) ---------------- */
+  var DELETE_CODE = "5259";
+  var pendingDeleteId = null;
+
+  function openDeleteConfirm(id){
+    var a = state.attendees.find(function(x){ return x.id === id; });
+    pendingDeleteId = id;
+    byId("deleteConfirmSub").textContent = (a ? "กำลังจะลบ " + fullName(a) : "กำลังจะลบรายชื่อนี้") + " ออกจากระบบ — การลบไม่สามารถย้อนกลับได้ กรุณากรอกรหัสยืนยันเพื่อดำเนินการต่อ";
+    byId("deleteConfirmCode").value = "";
+    byId("deleteConfirmError").hidden = true;
+    byId("deleteConfirmModal").hidden = false;
+    byId("deleteConfirmCode").focus();
+  }
+  function closeDeleteConfirm(){
+    byId("deleteConfirmModal").hidden = true;
+    pendingDeleteId = null;
+  }
+  function submitDeleteConfirm(){
+    var code = byId("deleteConfirmCode").value.trim();
+    if(code !== DELETE_CODE){
+      byId("deleteConfirmError").hidden = false;
+      byId("deleteConfirmCode").value = "";
+      byId("deleteConfirmCode").focus();
+      return;
+    }
+    var id = pendingDeleteId;
+    if(!id){ closeDeleteConfirm(); return; }
+    state.attendees = state.attendees.filter(function(x){ return x.id !== id; });
+    removeNewPersonLocal(id);
+    closeDeleteConfirm();
+    renderAll();
+    if(state.dbReady && state.db){
+      state.db.collection("attendees").doc(id).delete().catch(function(err){
+        console.error("delete person failed", err);
+      });
+    }
+  }
+
+  document.addEventListener("click", function(e){
+    var delBtn = e.target.closest('[data-role="delete-person"]');
+    if(delBtn) openDeleteConfirm(delBtn.getAttribute("data-id"));
+  });
+  byId("deleteConfirmCancelBtn").addEventListener("click", closeDeleteConfirm);
+  byId("deleteConfirmSubmitBtn").addEventListener("click", submitDeleteConfirm);
+  byId("deleteConfirmModal").addEventListener("click", function(e){
+    if(e.target.id === "deleteConfirmModal") closeDeleteConfirm();
+  });
+  byId("deleteConfirmCode").addEventListener("keydown", function(e){
+    if(e.key === "Enter") submitDeleteConfirm();
+  });
+
   function renderAll(){
     if(state.tab === "overview") renderOverview();
     if(state.tab === "golf"){
@@ -1798,6 +2006,14 @@
           state.attendees.push(r);
         }
       });
+    }catch(e){}
+  }
+  function removeNewPersonLocal(id){
+    try{
+      var raw = localStorage.getItem(NEW_PEOPLE_KEY);
+      if(!raw) return;
+      var arr = JSON.parse(raw).filter(function(r){ return r.id !== id; });
+      localStorage.setItem(NEW_PEOPLE_KEY, JSON.stringify(arr));
     }catch(e){}
   }
 
