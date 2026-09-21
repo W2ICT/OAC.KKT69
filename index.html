@@ -1019,7 +1019,7 @@
         '<div class="name-grid">' + (members.length ? members.map(function(a){
           var isDone = !!a[doneField];
           return '<button class="name-card' + (isDone ? ' done' : '') + '" data-role="name" data-activity="' + activity + '" data-id="' + esc(a.id) + '">' +
-            '<div class="name-card-body"><div class="nm">' + esc(fullName(a)) + '</div><div class="mt">' + esc(a.unit) + (a[transField] ? " · " + esc(a[transField]) : "") + '</div></div>' +
+            '<div class="name-card-body"><div class="nm">' + esc(fullName(a)) + (rankStars(a.rank) ? ' <span class="tag-stars">' + rankStars(a.rank) + '</span>' : '') + '</div><div class="mt">' + esc(a.unit) + (a[transField] ? " · " + esc(a[transField]) : "") + '</div></div>' +
             (isDone ? '<span class="chk">✓</span>' : '') +
           '</button>';
         }).join("") : '<div class="empty-note">ไม่พบรายชื่อในรุ่นนี้</div>') + '</div>';
@@ -1036,7 +1036,7 @@
       container.innerHTML =
         '<div class="crumb"><button class="back-btn" data-role="kiosk-back" data-activity="' + activity + '" data-target="names">◀ รายชื่อ</button></div>' +
         '<div class="confirm-card">' +
-          (a.rank ? '<div class="rank">' + esc(a.rank) + '</div>' : '') +
+          (a.rank ? '<div class="rank">' + esc(a.rank) + (rankStars(a.rank) ? ' <span class="tag-stars">' + rankStars(a.rank) + '</span>' : '') + '</div>' : '') +
           '<div class="nm">' + esc(a.name) + '</div>' +
           '<div class="mt">รุ่น นตท. ' + esc(a.ntBatch || "-") + ' · ' + esc(a.unit) + '</div>' +
           (a.position ? '<div class="mt">' + esc(a.position) + '</div>' : '') +
@@ -1648,12 +1648,14 @@
         chonoBatch: a.batch || "",
         phone: a.phone || "",
         unit: a.unit || "",
-        position: a.position || ""
+        position: a.position || "",
+        birthdate: a.birthdate || "",
+        callsign: a.callsign || ""
       };
     });
   }
 
-  var DIRECTORY_HEADERS = ["ยศ", "ชื่อ", "นามสกุล", "ชื่อเล่น", "รุ่น นตท.", "รุ่น ชนอ.", "เบอร์ติดต่อ", "สังกัด", "ตำแหน่ง"];
+  var DIRECTORY_HEADERS = ["ยศ", "ชื่อ", "นามสกุล", "ชื่อเล่น", "รุ่น นตท.", "รุ่น ชนอ.", "เบอร์ติดต่อ", "สังกัด", "ตำแหน่ง", "วันเกิด", "Callsign"];
 
   function exportDirectoryExcel(){
     if(typeof XLSX === "undefined"){
@@ -1662,10 +1664,10 @@
     }
     var rows = directoryRows();
     var aoa = [DIRECTORY_HEADERS].concat(rows.map(function(r){
-      return [r.rank, r.first, r.last, r.nickname, r.ntBatch, r.chonoBatch, r.phone, r.unit, r.position];
+      return [r.rank, r.first, r.last, r.nickname, r.ntBatch, r.chonoBatch, r.phone, r.unit, r.position, r.birthdate, r.callsign];
     }));
     var ws = XLSX.utils.aoa_to_sheet(aoa);
-    ws["!cols"] = [{wch:10},{wch:16},{wch:20},{wch:12},{wch:9},{wch:9},{wch:14},{wch:16},{wch:34}];
+    ws["!cols"] = [{wch:10},{wch:16},{wch:20},{wch:12},{wch:9},{wch:9},{wch:14},{wch:16},{wch:34},{wch:12},{wch:12}];
     var wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "ทำเนียบรุ่น");
     var wbout = XLSX.write(wb, {bookType:"xlsx", type:"array"});
@@ -1699,6 +1701,8 @@
         '<td>' + esc(r.phone) + '</td>' +
         '<td>' + esc(r.unit) + '</td>' +
         '<td>' + esc(r.position) + '</td>' +
+        '<td>' + esc(r.birthdate) + '</td>' +
+        '<td>' + esc(r.callsign) + '</td>' +
       '</tr>';
     }).join("");
 
@@ -1708,7 +1712,7 @@
         '<div class="meta">จำนวน ' + rows.length + ' คน<br>พิมพ์เมื่อ ' + esc(new Date().toLocaleString("th-TH")) + '</div>' +
       '</div>' +
       '<table class="ps-table"><thead><tr>' +
-        '<th class="ps-num">#</th><th>ยศ</th><th>ชื่อ</th><th>นามสกุล</th><th>ชื่อเล่น</th><th>รุ่น นตท.</th><th>รุ่น ชนอ.</th><th>เบอร์ติดต่อ</th><th>สังกัด</th><th>ตำแหน่ง</th>' +
+        '<th class="ps-num">#</th><th>ยศ</th><th>ชื่อ</th><th>นามสกุล</th><th>ชื่อเล่น</th><th>รุ่น นตท.</th><th>รุ่น ชนอ.</th><th>เบอร์ติดต่อ</th><th>สังกัด</th><th>ตำแหน่ง</th><th>วันเกิด</th><th>Callsign</th>' +
       '</tr></thead><tbody>' + bodyRows + '</tbody></table>' +
       '<div class="ps-footer">OAC KKT Reunion Day — ทำเนียบรุ่นสำหรับใช้ติดต่อปีถัดไป · เลือก "บันทึกเป็น PDF" ในหน้าต่างพิมพ์เพื่อเซฟไฟล์</div>';
 
