@@ -876,7 +876,9 @@
       if(a.paymentStatus === "รอชำระ"){ s.unpaidCount++; s.unpaidSum += (a.balanceDue||0); }
       if(a.paymentStatus === "ชำระแล้ว"){ s.paidCount++; }
       if(a.allergy && a.allergy.trim() && a.allergy.trim() !== "-"){ s.allergyCount++; }
-      var u = a.unit || "ไม่ระบุ"; s.units[u] = (s.units[u]||0) + 1;
+      var rawUnit = a.unit || "";
+      var u = !rawUnit ? "อื่นๆ" : (rawUnit === "กองบิน 2" || rawUnit.indexOf("บน.2") !== -1) ? "กองบิน 2" : "นอกกองบิน 2";
+      s.units[u] = (s.units[u]||0) + 1;
       if(a.shirtSize){ s.shirts[a.shirtSize] = (s.shirts[a.shirtSize]||0) + 1; }
       if(a.golf){ var gt = a.golfTransport || "ไม่ระบุ"; s.golfTrans[gt] = (s.golfTrans[gt]||0) + 1; }
       if(a.dinner){ var dt = a.dinnerTransport || "ไม่ระบุ"; s.dinnerTrans[dt] = (s.dinnerTrans[dt]||0) + 1; }
