@@ -990,7 +990,7 @@
         if(!groups[b]) groups[b] = [];
         groups[b].push(a);
       });
-      var keys = Object.keys(groups).sort(function(x,y){
+      var keys = Object.keys(groups).filter(function(k){ return k !== "ไม่ระบุ"; }).sort(function(x,y){
         var nx = parseInt(x,10), ny = parseInt(y,10);
         var xNum = !isNaN(nx), yNum = !isNaN(ny);
         if(xNum && yNum) return nx - ny;
