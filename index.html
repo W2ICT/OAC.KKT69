@@ -126,6 +126,26 @@
   .conn-status.live .conn-dot{ background:#4FBE85; box-shadow:0 0 0 3px rgba(79,190,133,0.25); }
   .conn-status.offline .conn-dot{ background:#E3AC44; }
 
+  .admin-btn{
+    flex:none; width:32px; height:32px; border-radius:9px; border:1px solid rgba(255,255,255,0.18);
+    background:rgba(255,255,255,0.08); color:#D8DEE9; cursor:pointer; font-size:15px; line-height:1;
+  }
+  .admin-btn:hover{ background:rgba(255,255,255,0.16); }
+  .admin-btn.active{ background:var(--accent-fill); border-color:var(--accent-fill); color:#20180A; }
+
+  .admin-tab-list{ display:flex; flex-direction:column; gap:8px; margin:14px 0; }
+  .admin-tab-row{
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    padding:10px 12px; border:1px solid var(--border); border-radius:11px; background:var(--surface-2);
+  }
+  .admin-tab-row .lbl{ font-weight:600; font-size:13.5px; }
+  .admin-toggle-btn{
+    flex:none; border:1px solid var(--border); border-radius:999px; padding:6px 14px;
+    font-size:12px; font-weight:700; cursor:pointer; background:var(--surface);
+  }
+  .admin-toggle-btn.on{ background:var(--success-bg); color:var(--success); border-color:var(--success); }
+  .admin-toggle-btn.off{ background:var(--danger-bg); color:var(--danger); border-color:var(--danger); }
+
   .tabs{
     display:flex; gap:4px; overflow-x:auto; padding-bottom:10px;
     scrollbar-width:none;
@@ -507,6 +527,7 @@
         </div>
       </div>
       <div id="connStatus" class="conn-status offline"><span class="conn-dot"></span><span id="connLabel">กำลังเชื่อมต่อ…</span></div>
+      <button class="admin-btn" id="adminBtn" type="button" title="ผู้ดูแลระบบ">🔧</button>
     </div>
     <nav class="tabs" role="tablist" id="tabNav">
       <button class="tab-btn" data-tab="overview" role="tab" aria-selected="true">ภาพรวม</button>
@@ -797,6 +818,34 @@
       </div>
     </div>
   </div>
+
+  <div class="modal-overlay" id="adminLoginModal" hidden>
+    <div class="modal-card">
+      <h3>🔧 เข้าสู่โหมดผู้ดูแลระบบ</h3>
+      <div class="sub">กรอกรหัสผู้ดูแลระบบเพื่อจัดการเปิด/ปิดหน้าต่างๆ ในระบบ</div>
+      <div class="form-field">
+        <label for="adminLoginCode">รหัสผู้ดูแลระบบ</label>
+        <input class="code-input" type="password" id="adminLoginCode" inputmode="numeric" placeholder="••••" maxlength="10">
+      </div>
+      <div class="form-error" id="adminLoginError" hidden>รหัสไม่ถูกต้อง กรุณาลองใหม่</div>
+      <div class="modal-actions">
+        <button class="btn" id="adminLoginCancelBtn" type="button">ยกเลิก</button>
+        <button class="btn primary" id="adminLoginSubmitBtn" type="button">เข้าสู่ระบบ</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="adminSettingsModal" hidden>
+    <div class="modal-card">
+      <h3>⚙️ ตั้งค่าการแสดงผลหน้าต่างๆ</h3>
+      <div class="sub">เปิด/ปิดหน้าที่จะให้แสดงในเมนูสำหรับผู้ใช้งานทุกคน — มีผลทันทีทุกอุปกรณ์ (หน้า "ภาพรวม" ปิดไม่ได้)</div>
+      <div class="admin-tab-list" id="adminTabList"></div>
+      <div class="modal-actions">
+        <button class="btn" id="adminLogoutBtn" type="button">ออกจากโหมดผู้ดูแล</button>
+        <button class="btn primary" id="adminSettingsCloseBtn" type="button">ปิด</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -835,6 +884,8 @@
     shirtSearch: "", shirtSizeFilter: "", shirtStarFilter: "", shirtHideDone: false,
     planSearch: "", planUnit: "", planActivity: "", planExpanded: {},
     phoneSearch: "",
+    isAdmin: false,
+    tabVisibility: { golf: true, dinner: true, shirt: true, phonebook: true, planning: true },
     pendingIds: {},
     golfMode: "kiosk", dinnerMode: "kiosk",
     golfKioskView: "batch", golfKioskBatch: null, golfKioskPersonId: null,
@@ -2022,7 +2073,110 @@
     if(e.key === "Enter") submitDeleteConfirm();
   });
 
+  /* ---------------- Admin mode: show/hide tabs (code-gated) ---------------- */
+  var ADMIN_CODE = "5259";
+  var TOGGLEABLE_TABS = [
+    { key: "golf", label: "⛳ เช็คชื่อกอล์ฟ" },
+    { key: "dinner", label: "🍽 เช็คชื่อเลี้ยง" },
+    { key: "shirt", label: "👕 แจกเสื้อ" },
+    { key: "phonebook", label: "📞 สมุดโทรศัพท์" },
+    { key: "planning", label: "📋 รายชื่อ / วางแผน" }
+  ];
+
+  function applyTabVisibility(){
+    document.querySelectorAll(".tab-btn").forEach(function(btn){
+      var key = btn.getAttribute("data-tab");
+      var visible = key === "overview" || state.tabVisibility[key] !== false;
+      btn.hidden = !visible;
+    });
+    if(state.tab !== "overview" && state.tabVisibility[state.tab] === false){
+      setTab("overview");
+    }
+    byId("adminBtn").classList.toggle("active", state.isAdmin);
+  }
+
+  function saveTabVisibility(){
+    if(state.dbReady && state.db){
+      state.db.collection("meta").doc("settings").set({ tabVisibility: state.tabVisibility }, { merge: true }).catch(function(err){
+        console.error("save tabVisibility failed", err);
+      });
+    }
+  }
+
+  function setTabVisibility(key, value){
+    state.tabVisibility[key] = value;
+    applyTabVisibility();
+    renderAdminSettings();
+    saveTabVisibility();
+  }
+
+  function renderAdminSettings(){
+    byId("adminTabList").innerHTML = TOGGLEABLE_TABS.map(function(t){
+      var on = state.tabVisibility[t.key] !== false;
+      return '<div class="admin-tab-row">' +
+        '<span class="lbl">' + t.label + '</span>' +
+        '<button class="admin-toggle-btn ' + (on ? "on" : "off") + '" data-role="admin-toggle" data-key="' + t.key + '" type="button">' +
+          (on ? "✅ เปิดแสดง" : "🚫 ซ่อนอยู่") +
+        '</button>' +
+      '</div>';
+    }).join("");
+  }
+
+  function openAdminLogin(){
+    byId("adminLoginCode").value = "";
+    byId("adminLoginError").hidden = true;
+    byId("adminLoginModal").hidden = false;
+    byId("adminLoginCode").focus();
+  }
+  function closeAdminLogin(){ byId("adminLoginModal").hidden = true; }
+  function submitAdminLogin(){
+    var code = byId("adminLoginCode").value.trim();
+    if(code !== ADMIN_CODE){
+      byId("adminLoginError").hidden = false;
+      byId("adminLoginCode").value = "";
+      byId("adminLoginCode").focus();
+      return;
+    }
+    state.isAdmin = true;
+    closeAdminLogin();
+    openAdminSettings();
+    applyTabVisibility();
+  }
+  function openAdminSettings(){
+    renderAdminSettings();
+    byId("adminSettingsModal").hidden = false;
+  }
+  function closeAdminSettings(){ byId("adminSettingsModal").hidden = true; }
+
+  byId("adminBtn").addEventListener("click", function(){
+    if(state.isAdmin) openAdminSettings(); else openAdminLogin();
+  });
+  byId("adminLoginCancelBtn").addEventListener("click", closeAdminLogin);
+  byId("adminLoginSubmitBtn").addEventListener("click", submitAdminLogin);
+  byId("adminLoginModal").addEventListener("click", function(e){
+    if(e.target.id === "adminLoginModal") closeAdminLogin();
+  });
+  byId("adminLoginCode").addEventListener("keydown", function(e){
+    if(e.key === "Enter") submitAdminLogin();
+  });
+  byId("adminSettingsCloseBtn").addEventListener("click", closeAdminSettings);
+  byId("adminSettingsModal").addEventListener("click", function(e){
+    if(e.target.id === "adminSettingsModal") closeAdminSettings();
+  });
+  byId("adminLogoutBtn").addEventListener("click", function(){
+    state.isAdmin = false;
+    closeAdminSettings();
+    applyTabVisibility();
+  });
+  byId("adminTabList").addEventListener("click", function(e){
+    var btn = e.target.closest('[data-role="admin-toggle"]');
+    if(!btn) return;
+    var key = btn.getAttribute("data-key");
+    setTabVisibility(key, state.tabVisibility[key] === false);
+  });
+
   function renderAll(){
+    applyTabVisibility();
     if(state.tab === "overview") renderOverview();
     if(state.tab === "golf"){
       updateActivitySummary("golf");
@@ -2170,6 +2324,16 @@
       }, function(err){
         console.error("db subscription error", err);
         goOffline();
+      });
+      db.collection("meta").doc("settings").onSnapshot(function(doc){
+        var data = doc.data();
+        if(data && data.tabVisibility){
+          state.tabVisibility = Object.assign({ golf: true, dinner: true, shirt: true, phonebook: true, planning: true }, data.tabVisibility);
+          applyTabVisibility();
+          if(!byId("adminSettingsModal").hidden) renderAdminSettings();
+        }
+      }, function(err){
+        console.error("settings subscription error", err);
       });
       renderAll();
     } catch(err){
