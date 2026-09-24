@@ -289,6 +289,17 @@
   .stat-pill.pending{ background:var(--warning-bg); color:var(--warning); border-color:transparent; }
   .stat-pill.done{ background:var(--success-bg); color:var(--success); border-color:transparent; }
 
+  .phone-row{ display:flex; align-items:center; justify-content:space-between; gap:10px; padding:11px 14px; }
+  .phone-row-main{ min-width:0; flex:1 1 auto; }
+  .phone-call-btn{
+    flex:none; display:inline-flex; align-items:center; gap:6px; text-decoration:none;
+    background:var(--success-bg); color:var(--success); border:1px solid var(--success);
+    border-radius:999px; padding:9px 16px; font-weight:700; font-size:14px; font-variant-numeric:tabular-nums;
+    white-space:nowrap;
+  }
+  .phone-call-btn:active{ opacity:.75; }
+  .phone-none{ flex:none; font-size:12px; color:var(--text-dim); padding:9px 12px; }
+
   .plan-detail{ border-top:1px dashed var(--border); padding:12px 14px 14px; background:var(--surface-2); }
   .plan-detail-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(150px,1fr)); gap:10px 16px; }
   .plan-detail-item .lbl{ font-size:10.5px; color:var(--text-dim); font-weight:600; text-transform:uppercase; letter-spacing:.03em; }
@@ -502,6 +513,7 @@
       <button class="tab-btn" data-tab="golf" role="tab" aria-selected="false">⛳ เช็คชื่อกอล์ฟ <span class="count" id="golfTabCount"></span></button>
       <button class="tab-btn" data-tab="dinner" role="tab" aria-selected="false">🍽 เช็คชื่อเลี้ยง <span class="count" id="dinnerTabCount"></span></button>
       <button class="tab-btn" data-tab="shirt" role="tab" aria-selected="false">👕 แจกเสื้อ <span class="count" id="shirtTabCount"></span></button>
+      <button class="tab-btn" data-tab="phonebook" role="tab" aria-selected="false">📞 สมุดโทรศัพท์</button>
       <button class="tab-btn" data-tab="planning" role="tab" aria-selected="false">📋 รายชื่อ / วางแผน</button>
     </nav>
   </header>
@@ -647,6 +659,17 @@
     </section>
 
     <!-- PLANNING -->
+    <section id="tab-phonebook" class="tab-panel" hidden>
+      <div class="section-head">
+        <h2>📞 สมุดโทรศัพท์</h2>
+        <span class="hint" id="phoneCount"></span>
+      </div>
+      <div class="controls-row">
+        <input class="search-input" id="phoneSearch" type="text" placeholder="ค้นหาชื่อ, ชื่อเล่น, รุ่น, สังกัด, เบอร์โทร…">
+      </div>
+      <div class="plan-list" id="phoneBody"></div>
+    </section>
+
     <section id="tab-planning" class="tab-panel" hidden>
       <div class="section-head">
         <h2>📋 รายชื่อทั้งหมด / ตารางวางแผน</h2>
@@ -811,6 +834,7 @@
     dinnerSearch: "", dinnerHideDone: false,
     shirtSearch: "", shirtSizeFilter: "", shirtStarFilter: "", shirtHideDone: false,
     planSearch: "", planUnit: "", planActivity: "", planExpanded: {},
+    phoneSearch: "",
     pendingIds: {},
     golfMode: "kiosk", dinnerMode: "kiosk",
     golfKioskView: "batch", golfKioskBatch: null, golfKioskPersonId: null,
@@ -1404,6 +1428,46 @@
     return '<span class="stat-pill pending">' + icon + '</span>';
   }
 
+  function telHref(phone){
+    var digits = String(phone || "").replace(/[^0-9+]/g, "");
+    return "tel:" + digits;
+  }
+
+  function renderPhonebook(){
+    var q = state.phoneSearch.trim().toLowerCase();
+    var list = state.attendees.slice();
+    if(q){
+      list = list.filter(function(a){
+        var hay = (fullName(a) + " " + (a.nickname||"") + " " + a.unit + " " + (a.position||"") + " " + a.phone + " " + a.ntBatch + " " + a.batch).toLowerCase();
+        return hay.indexOf(q) !== -1;
+      });
+    }
+    list.sort(function(a,b){
+      var ba = a.ntBatch && a.ntBatch.trim() ? parseInt(a.ntBatch,10) : NaN;
+      var bb = b.ntBatch && b.ntBatch.trim() ? parseInt(b.ntBatch,10) : NaN;
+      var na = isNaN(ba), nb = isNaN(bb);
+      if(na !== nb) return na ? 1 : -1;
+      if(!na && ba !== bb) return ba - bb;
+      return fullName(a).localeCompare(fullName(b), "th");
+    });
+
+    var withPhone = list.filter(function(a){ return a.phone && a.phone.trim(); }).length;
+    byId("phoneCount").textContent = "แสดง " + list.length + " รายชื่อ · มีเบอร์โทร " + withPhone + " รายชื่อ";
+
+    byId("phoneBody").innerHTML = list.length ? list.map(function(a){
+      var hasPhone = a.phone && a.phone.trim();
+      return '<div class="plan-row phone-row">' +
+        '<div class="phone-row-main">' +
+          '<div class="plan-name">' + esc(fullName(a)) + '</div>' +
+          '<div class="plan-sub">รุ่น นตท. ' + esc(a.ntBatch || "-") + ' · ' + esc(a.unit) + (a.position ? ' · ' + esc(a.position) : '') + '</div>' +
+        '</div>' +
+        (hasPhone
+          ? '<a class="phone-call-btn" href="' + telHref(a.phone) + '">📞 ' + esc(a.phone) + '</a>'
+          : '<span class="phone-none">ไม่มีเบอร์</span>') +
+      '</div>';
+    }).join("") : '<div class="empty-note" style="padding:20px;">ไม่พบรายชื่อที่ตรงกับเงื่อนไข</div>';
+  }
+
   function renderPlanning(){
     var q = state.planSearch.trim().toLowerCase();
     var list = state.attendees.slice();
@@ -1794,6 +1858,7 @@
   byId("golfHideDone").addEventListener("change", function(e){ state.golfHideDone = e.target.checked; renderStaffRoster("golf"); });
   byId("dinnerSearch").addEventListener("input", function(e){ state.dinnerSearch = e.target.value; renderStaffRoster("dinner"); });
   byId("dinnerHideDone").addEventListener("change", function(e){ state.dinnerHideDone = e.target.checked; renderStaffRoster("dinner"); });
+  byId("phoneSearch").addEventListener("input", function(e){ state.phoneSearch = e.target.value; renderPhonebook(); });
   byId("planSearch").addEventListener("input", function(e){ state.planSearch = e.target.value; renderPlanning(); });
   byId("planUnit").addEventListener("change", function(e){ state.planUnit = e.target.value; renderPlanning(); });
   byId("planActivity").addEventListener("change", function(e){ state.planActivity = e.target.value; renderPlanning(); });
@@ -1968,6 +2033,7 @@
       if(state.dinnerMode === "kiosk") renderKiosk("dinner"); else renderStaffRoster("dinner");
     }
     if(state.tab === "shirt") { renderShirtTab(); }
+    if(state.tab === "phonebook") { renderPhonebook(); }
     if(state.tab === "planning") { populateUnitFilter(); renderPlanning(); }
     byId("golfTabCount").textContent = "(" + state.attendees.filter(function(a){return a.golf && a.golfCheckedIn;}).length + "/" + state.attendees.filter(function(a){return a.golf;}).length + ")";
     byId("dinnerTabCount").textContent = "(" + state.attendees.filter(function(a){return a.dinner && a.dinnerCheckedIn;}).length + "/" + state.attendees.filter(function(a){return a.dinner;}).length + ")";
